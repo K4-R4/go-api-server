@@ -3,13 +3,29 @@ package main
 import (
     "fmt"
     "io"
+    "encoding/json"
     "log"
     "net/http"
 )
 
+type ApiResponse struct {
+	Response struct {
+		Location []struct {
+			City       string `json:"city"`
+			CityKana   string `json:"city_kana"`
+			Town       string `json:"town"`
+			TownKana   string `json:"town_kana"`
+			X          string `json:"x"`
+			Y          string `json:"y"`
+			Prefecture string `json:"prefecture"`
+			Postal     string `json:"postal"`
+		} `json:"location"`
+	} `json:"response"`
+}
+
 type Address struct {
     PostalCode string `json:"postal_code"`
-    HitCount int64 `json:"hit_count"`
+    HitCount int `json:"hit_count"`
     Address string `json:"address"`
     TokyoStaDistance float64 `json:"tokyo_sta_distance"`
 }
@@ -47,34 +63,19 @@ func returnAddress(w http.ResponseWriter, r *http.Request) {
     }
     defer resp.Body.Close()
     byteArray, _ := io.ReadAll(resp.Body)
-    fmt.Printf("log: %s", byteArray)
+    fmt.Printf("log: %s\n", byteArray)
+    apiResponse := ApiResponse{}
+    err = json.Unmarshal(byteArray, &apiResponse)
+    if err != nil {
+        w.WriteHeader(http.StatusInternalServerError)
+        return
+    }
+
+    address := Address{}
+    address.PostalCode = param
+    address.HitCount = len(apiResponse.Response.Location)
+    fmt.Printf("log: %v\n", len(apiResponse.Response.Location))
 }
-
-/*
-func doRequest(method, path string, values url.Values, body io.Reader) ([]byte, error) {
-    client := &http.Client{
-        Timeout: 20 * time.Second,
-    }
-
-    req, err := http.NewRequest(method, path, body)
-    if err != nil {
-        return nil, err
-    }
-    req.URL.RawQuery = values.Encode()
-
-    resp, err := client.Do(req)
-    if err != nil {
-        return nil, err
-    }
-
-    data, err := ioutil.ReadAll(resp.Body)
-    if err != nil {
-        return nil, err
-    }
-
-    return data, nil
-}
-*/
 
 func main() {
     handleRequests()
