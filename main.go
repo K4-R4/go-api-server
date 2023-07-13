@@ -66,7 +66,6 @@ func returnAddress(w http.ResponseWriter, r *http.Request) {
     }
     defer resp.Body.Close()
     byteArray, _ := io.ReadAll(resp.Body)
-    fmt.Printf("log: %s\n", byteArray)
     apiResponse := ApiResponse{}
     err = json.Unmarshal(byteArray, &apiResponse)
     if err != nil {
@@ -83,7 +82,7 @@ func returnAddress(w http.ResponseWriter, r *http.Request) {
         w.WriteHeader(http.StatusInternalServerError)
         return
     }
-    fmt.Printf("Response: %v\n", address)
+    json.NewEncoder(w).Encode(address)
 }
 
 func extractCommonAddress(resp *ApiResponse) string {
