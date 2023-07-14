@@ -8,6 +8,8 @@ services:
     tty: true
     ports:
       - "8080:8080"
+    networks:
+      - go_api_network
   mysql:
     image: mysql:8
     container_name: mysql
@@ -22,3 +24,8 @@ services:
       - ./init:/docker-entrypoint-initdb.d
     ports:
       - ${DB_PORT}:3306
+    networks:
+      - go_api_network
+
+networks:
+  go_api_network:
