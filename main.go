@@ -1,6 +1,7 @@
 package main
 
 import (
+    "database/sql"
     "errors"
     "fmt"
     "io"
@@ -9,6 +10,7 @@ import (
     "math"
     "net/http"
     "strconv"
+    _ "github.com/go-sql-driver/mysql"
 )
 
 type ApiResponse struct {
@@ -82,6 +84,11 @@ func returnAddress(w http.ResponseWriter, r *http.Request) {
         w.WriteHeader(http.StatusInternalServerError)
         return
     }
+    err = saveAccessLog(address.PostalCode)
+    if err != nil {
+        w.WriteHeader(http.StatusInternalServerError)
+        return
+    }
     json.NewEncoder(w).Encode(address)
 }
 
@@ -126,6 +133,40 @@ func calcTokyoStaDistance(resp *ApiResponse) (float64, error) {
     }
     const base = 10
     return math.Round(maxDist * base) / base, nil
+}
+
+func connect() (*sql.DB, error) {
+    user := "root"
+    password := "root"
+    host := "127.0.0.1"
+    port := "3306"
+    dbname := "go-api-db"
+
+    dbconf := user + ":" + password + "@tcp(" + host + ":" + port +")/" + dbname
+
+    db, err := sql.Open("mysql", dbconf)
+    if err != nil {
+        fmt.Printf("DB OPNE ERROR\n")
+        return nil, err
+    }
+    err = db.Ping()
+    if err != nil {
+        fmt.Printf("DB PING ERROR\n")
+    }
+    return db, nil
+}
+
+func saveAccessLog(postalCode string) error {
+    db, err := connect()
+    defer db.Close()
+    if err != nil {
+        return err
+    }
+    _, err = db.Exec( `INSERT INTO access_logs(postal_code) VALUES(?)`, postalCode)
+    if err != nil {
+        return err
+    }
+    return nil
 }
 
 func main() {
