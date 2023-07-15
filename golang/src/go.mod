@@ -1,4 +1,4 @@
-module github.com/K4-R4/go-api-server
+module go-api-server
 
 go 1.20
 
