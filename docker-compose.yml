@@ -1,31 +1,46 @@
 version: "3"
 
 services:
-  app:
-    build: .
-    depends_on:
-      - mysql
+  go:
+    container_name: go
+    build:
+      context: ./golang
+      dockerfile: Dockerfile
     tty: true
     ports:
       - "8080:8080"
+    env_file:
+      - ./mysql/.env
+    depends_on:
+      - mysql
+    volumes:
+      - type: bind
+        source: ./golang/src
+        target: /go/src
     networks:
       - go_api_network
   mysql:
-    image: mysql:8
     container_name: mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: ${ROOT_PASS}
-      MYSQL_DATABASE: ${DB_NAME}
-      MYSQL_USER: ${DB_USER}
-      MYSQL_PASSWORD: ${DB_PASS}
-      TZ: ${TZ}
-    volumes:
-      - ./my.cnf:/etc/mysql/conf.d/my.cnf
-      - ./init:/docker-entrypoint-initdb.d
+    build:
+      context: ./mysql
+      dockerfile: Dockerfile
     ports:
-      - ${DB_PORT}:3306
+      - 3306:3306
+    env_file:
+      - ./mysql/.env
+    volumes:
+      - type: volume
+        source: mysql_volume
+        target: /var/lib/mysql
+      - type: bind
+        source: ./mysql/init
+        target: /docker-entrypoint-initdb.d
     networks:
       - go_api_network
+
+volumes:
+  mysql_volume:
+    name: mysql_volume
 
 networks:
   go_api_network:

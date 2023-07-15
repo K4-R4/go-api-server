@@ -9,8 +9,10 @@ import (
     "log"
     "math"
     "net/http"
+    "os"
     "strconv"
     _ "github.com/go-sql-driver/mysql"
+    _ "github.com/joho/godotenv"
 )
 
 type ApiResponse struct {
@@ -73,6 +75,7 @@ func returnAddress(w http.ResponseWriter, r *http.Request) {
 
     resp, err := http.Get("https://geoapi.heartrails.com/api/json?method=searchByPostal&postal=" + param)
     if err != nil {
+        fmt.Printf("get error\n")
         w.WriteHeader(http.StatusInternalServerError)
         return
     }
@@ -82,6 +85,7 @@ func returnAddress(w http.ResponseWriter, r *http.Request) {
     err = json.Unmarshal(byteArray, &apiResponse)
     if err != nil {
         w.WriteHeader(http.StatusInternalServerError)
+        fmt.Printf("unmarshal error\n")
         return
     }
 
@@ -92,11 +96,13 @@ func returnAddress(w http.ResponseWriter, r *http.Request) {
     address.TokyoStaDistance, err = calcTokyoStaDistance(&apiResponse)
     if err != nil {
         w.WriteHeader(http.StatusInternalServerError)
+        fmt.Printf("parsing float error\n")
         return
     }
     err = saveAccessLog(address.PostalCode)
     if err != nil {
         w.WriteHeader(http.StatusInternalServerError)
+        fmt.Printf("save access log error\n")
         return
     }
     json.NewEncoder(w).Encode(address)
@@ -163,20 +169,23 @@ func calcTokyoStaDistance(resp *ApiResponse) (float64, error) {
 }
 
 func connect() (*sql.DB, error) {
-    user := "root"
-    password := "root"
+    user := os.Getenv("MYSQL_USER")
+    password := os.Getenv("MYSQL_PASSWORD")
     host := "mysql"
-    port := "3306"
-    dbname := "go-api-db"
+    port := os.Getenv("MYSQL_PORT")
+    dbname := os.Getenv("MYSQL_DATABASE")
 
-    dbconf := user + ":" + password + "@tcp(" + host + ":" + port +")/" + dbname
+    dbconf := user + ":" + password + "@tcp(" + host + ":" + port +")/" + dbname + "?charset=utf8mb4"
+    fmt.Printf(dbconf)
 
     db, err := sql.Open("mysql", dbconf)
     if err != nil {
+        fmt.Printf("OPEN ERROR\n")
         return nil, err
     }
     err = db.Ping()
     if err != nil {
+        fmt.Printf("PING ERROR\n")
     }
     return db, nil
 }
@@ -187,7 +196,9 @@ func saveAccessLog(postalCode string) error {
     if err != nil {
         return err
     }
-    _, err = db.Exec(`INSERT INTO access_logs(postal_code) VALUES(?)`, postalCode)
+    _, err = db.Exec(`
+        INSERT INTO
+            access_logs(postal_code) VALUES(?)`, postalCode)
     if err != nil {
         return err
     }
@@ -201,7 +212,15 @@ func getAccessLogs() (AddressAccessLogs, error) {
         return AddressAccessLogs{}, err
     }
 
-    rows, err := db.Query("SELECT postal_code, COUNT(id) FROM access_logs GROUP BY postal_code ORDER BY COUNT(id) DESC")
+    rows, err := db.Query(`
+        SELECT
+            postal_code, COUNT(id)
+        FROM
+            access_logs
+        GROUP BY
+            postal_code
+        ORDER BY
+            COUNT(id) DESC`)
     defer rows.Close()
     if err != nil {
         return AddressAccessLogs{}, err

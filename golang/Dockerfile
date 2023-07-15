@@ -1,7 +1,4 @@
 FROM golang:alpine
 
-ENV GOPATH=
-
-WORKDIR /go
-ADD . /go
+WORKDIR /go/src
 CMD ["go", "run", "main.go"]
