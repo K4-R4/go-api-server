@@ -36,7 +36,11 @@ type AddressResponse struct {
     TokyoStaDistance float64 `json:"tokyo_sta_distance"`
 }
 
-func ReturnHomePage(w http.ResponseWriter, _ *http.Request) {
+func ReturnHomePage(w http.ResponseWriter, r *http.Request) {
+    if r.URL.Path != "/" {
+        http.NotFound(w, r)
+        return
+    }
     fmt.Fprint(w, "Hello World!\n")
 }
 
