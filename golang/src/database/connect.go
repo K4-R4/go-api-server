@@ -26,7 +26,6 @@ func Connect() (*sql.DB, error) {
     dbname := os.Getenv("MYSQL_DATABASE")
 
     dbconf := user + ":" + password + "@tcp(" + host + ":" + port +")/" + dbname + "?charset=utf8mb4"
-    fmt.Printf(dbconf)
 
     db, err := sql.Open("mysql", dbconf)
     if err != nil {

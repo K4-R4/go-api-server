@@ -8,6 +8,8 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+    "unicode/utf8"
+    "strings"
 
 	"go-api-server/database"
 )
@@ -54,6 +56,7 @@ func ReturnAddress(w http.ResponseWriter, r *http.Request) {
         return
     }
 
+    // Get data via external API
     geoResp, err := http.Get("https://geoapi.heartrails.com/api/json?method=searchByPostal&postal=" + param)
     if err != nil {
         log.Println(err.Error())
@@ -61,21 +64,27 @@ func ReturnAddress(w http.ResponseWriter, r *http.Request) {
         return
     }
     defer geoResp.Body.Close()
-    geoRespByte, _ := io.ReadAll(geoResp.Body)
-    apiResponse := GeoApiResponse{}
 
-    err = json.Unmarshal(geoRespByte, &apiResponse)
+    // Convert raw API response to struct
+    geoRespByte, _ := io.ReadAll(geoResp.Body)
+    geoRespStruct := GeoApiResponse{}
+    err = json.Unmarshal(geoRespByte, &geoRespStruct)
     if err != nil {
         w.WriteHeader(http.StatusInternalServerError)
         log.Println(err.Error())
         return
     }
+    if len(geoRespStruct.Response.Location) == 0 {
+        w.WriteHeader(http.StatusBadRequest)
+        return
+    }
 
+    // Generate API response
     adrResp := AddressResponse{}
     adrResp.PostalCode = param
-    adrResp.HitCount = len(apiResponse.Response.Location)
-    adrResp.Address = extractCommonAddress(&apiResponse)
-    adrResp.TokyoStaDistance, err = calcTokyoStaDistance(&apiResponse)
+    adrResp.HitCount = len(geoRespStruct.Response.Location)
+    adrResp.Address = extractCommonAddress(&geoRespStruct)
+    adrResp.TokyoStaDistance, err = calcTokyoStaDistance(&geoRespStruct)
     if err != nil {
         w.WriteHeader(http.StatusInternalServerError)
         log.Println(err.Error())
@@ -91,26 +100,24 @@ func ReturnAddress(w http.ResponseWriter, r *http.Request) {
 }
 
 func extractCommonAddress(resp *GeoApiResponse) string {
-    var pref, city, town string
+    adr := ""
     if len(resp.Response.Location) > 0 {
-        pref = resp.Response.Location[0].Prefecture
-        city = resp.Response.Location[0].City
-        town = resp.Response.Location[0].Town
+        adr += resp.Response.Location[0].Prefecture
+        adr += resp.Response.Location[0].City
+        adr += resp.Response.Location[0].Town
     } else {
         return ""
     }
     for _, v := range resp.Response.Location {
-        if v.Prefecture != pref {
-            pref, city, town = "", "", ""
+        newAdr := v.Prefecture + v.City + v.Town
+        for !strings.HasPrefix(newAdr, adr) {
+            adr = string([]rune(adr)[:utf8.RuneCountInString(adr) - 1])
         }
-        if v.City != city {
-            city, town = "", ""
-        }
-        if v.Town != town {
-            town = ""
+        if adr == "" {
+            break
         }
     }
-    return pref + city + town
+    return adr
 }
 
 func calcTokyoStaDistance(resp *GeoApiResponse) (float64, error) {
